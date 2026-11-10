@@ -1,0 +1,20 @@
+# Plain-words glossary (use when the user is unsure)
+- Agent: a loop. LLM + tools + instructions, runs until a stop condition. The loop is the agent, not the model.
+- Workflow: your code decides the steps; an LLM may be one step but never picks the next one.
+- Trajectory: every step an agent took (plans, tool calls, observations).
+- Observation: the tool result your code feeds back to the model.
+- Gate: a plain-code check between steps (an if statement) that can stop the chain.
+- Harness: the software around the model (Claude Code, Cursor...) with its own prompts, tools and rules.
+- Handoff: the small object passed from one agent to the next.
+- Dispatcher / router: classifies each input and sends it down ONE path.
+- Aggregator: the merge step after parallel work (can be plain code).
+- Sectioning / voting: parallel different subtasks / parallel repeats of the same task.
+- Evaluator-optimizer: generate, check, revise, stop.
+- ReAct: think, act, observe, repeat. Plan-and-Execute: plan once, then execute without re-planning. CodeAct: actions are code run in a sandbox.
+- Orchestrator: central LLM that splits work and delegates. Supervisor: orchestrator agent, the only one talking to the user, can be nested.
+- Peer-to-peer: equal agents, no coordinator (last resort).
+- Reflection: check the result and retry, ideally with an external signal. Self-Refine: same model critiques itself, no external signal. Reflexion: actor + evaluator + reflection model.
+- RAG: retrieve relevant chunks and add them to the prompt. Re-ranker: re-scores results by how helpful they are. MMR: removes near-duplicates.
+- Compaction: shrinking context (lossless: store it; lossy: summarize).
+- pass@k: at least one success in K tries. pass^k: all K tries succeed.
+- Eval hacking: the agent games the test instead of solving the problem.
