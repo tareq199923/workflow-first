@@ -1,5 +1,7 @@
 # workflow-first
 
+![workflow-first: plain code, workflow, single agent and multi-agent, with a checkpoint between each step. Below, the skill interviews you, writes WORKFLOW.md, runs the checker, and prints OK or FAIL.](assets/workflow-first-overview.svg)
+
 `workflow-first` is an agent skill that helps you decide how to build an AI-powered project before you build it. It interviews you, writes a `WORKFLOW.md` design document from your own answers, and a plain-Python script checks that document.
 
 The skill is built around one rule: **start as far left as you can, and move right only when the simpler design has been measured to fail.**
@@ -110,6 +112,8 @@ workflow-first/
     WORKFLOW-light.md           light template (7 sections)
     WORKFLOW-light.example.md   a filled-in light file that passes the checker
     eval-task.yaml              template for one eval task
+  assets/
+    workflow-first-overview.svg the diagram at the top of this README
 ```
 
 ## License
