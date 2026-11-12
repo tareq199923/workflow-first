@@ -9,6 +9,7 @@ Correct result looks like: Summary matches ticket.
 Position: workflow
 Pattern: prompt chaining
 Why not further left: Needs language understanding that code cannot do.
+Tools used: none
 Agent steps inside workflow: n/a: none
 
 ## 3. Arrows (who decides the next step)
@@ -38,8 +39,11 @@ On bad output or tool failure: return an error
 ## 6. Evals
 Eval folder: evals/
 Eval tasks: 12
+Seeded from: user feedback and manual QA
 No-tool tests: 2
-Tool-error tests: 2
+Tool-error tests: 0
+Model-error tests: 1
+Unsafe-request tests: 1
 
 ## 7. Move-right trigger
 - pass rate < 90% over 3 runs, or avg retries > 2, after trying a stronger model on the failing step

@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CHECKER = REPO_ROOT / "scripts" / "check_workflow.py"
+EVALS_CHECKER = REPO_ROOT / "scripts" / "check_evals.py"
 
 
 def run_checker(text, *args, cwd=None):
@@ -15,6 +16,30 @@ def run_checker(text, *args, cwd=None):
         path.write_text(text, encoding="utf-8")
         completed = subprocess.run(
             [sys.executable, str(CHECKER), str(path), *args],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+        return completed.returncode, completed.stdout + completed.stderr
+
+
+def run_evals(workflow_text, eval_files=None, *args, dirs=(), cwd=None, python_flags=()):
+    """Write a temp project and run check_evals.py, return (exit_code, output).
+
+    eval_files maps a path relative to the project root (for example
+    "evals/task.yaml") to its text. dirs creates empty directories.
+    """
+    with tempfile.TemporaryDirectory(prefix="workflow first evals ") as tmp:
+        root = Path(tmp)
+        (root / "WORKFLOW.md").write_text(workflow_text, encoding="utf-8")
+        for directory in dirs:
+            (root / directory).mkdir(parents=True, exist_ok=True)
+        for name, content in (eval_files or {}).items():
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        completed = subprocess.run(
+            [sys.executable, *python_flags, str(EVALS_CHECKER), str(root / "WORKFLOW.md"), *args],
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -117,6 +142,7 @@ Eval tasks: 20
 Seeded from: user feedback and synthetic
 No-tool tests: 3
 Tool-error tests: 2
+Model-error tests: 1
 Unsafe-request tests: 2
 Metric: pass^k, consistency matters
 Run conditions: same model, provider and harness; 3 runs per task
@@ -151,6 +177,7 @@ Correct result looks like: Summary matches ticket.
 Position: workflow
 Pattern: prompt chaining
 Why not further left: Needs language understanding that code cannot do.
+Tools used: none
 Agent steps inside workflow: n/a: none
 
 ## 3. Arrows (who decides the next step)
@@ -180,8 +207,11 @@ On bad output or tool failure: return an error
 ## 6. Evals
 Eval folder: evals/
 Eval tasks: 12
+Seeded from: user feedback and manual QA
 No-tool tests: 2
-Tool-error tests: 2
+Tool-error tests: 0
+Model-error tests: 1
+Unsafe-request tests: 1
 
 ## 7. Move-right trigger
 - pass rate < 90% over 3 runs, or avg retries > 2, after trying a stronger model on the failing step

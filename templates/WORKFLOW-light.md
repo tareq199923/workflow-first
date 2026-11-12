@@ -10,6 +10,7 @@ Correct result looks like: <how you know it worked>
 Position: <plain-code | workflow>
 Pattern: <e.g. prompt chaining, router, parallel, evaluator-optimizer>
 Why not further left: <what the simpler option could not do; "n/a" only for plain-code>
+Tools used: <none | list the tools this design can call>
 Agent steps inside workflow: <"n/a: none">
 
 ## 3. Arrows (who decides the next step)
@@ -40,8 +41,11 @@ Mark each item [x] when done, or [n/a: reason].
 ## 6. Evals
 Eval folder: <path, e.g. evals/>
 Eval tasks: <number, aim for 10 or more>
-No-tool tests: <number where the tool must NOT be called>
-Tool-error tests: <number>
+Seeded from: <bug | user feedback | manual QA | synthetic>
+No-tool tests: <number where a tool must NOT be called; 0 if no tools>
+Tool-error tests: <number; 0 if no tools>
+Model-error tests: <number; at least 1 when the LLM has no tools>
+Unsafe-request tests: <number; 0 allowed with a warning>
 
 ## 7. Move-right trigger
 Measured result that would make you move one step right (then switch to the full template).

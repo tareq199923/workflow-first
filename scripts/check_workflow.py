@@ -110,6 +110,8 @@ def check_light(text, early):
     inside = need_field(s2, 2, "Agent steps inside workflow", False)
     if inside and not is_placeholder(inside) and not is_na(inside):
         fails.append("Section 2: an agent step inside the workflow needs the full template (templates/WORKFLOW.md)")
+    tools = need_field(s2, 2, "Tools used")
+    has_tools = bool(tools) and not is_placeholder(tools) and not is_na(tools) and tools.strip().lower() not in ("none", "no tools")
 
     data = table_rows(s3)
     if not data:
@@ -155,18 +157,23 @@ def check_light(text, early):
             fails.append(f"Section 5: item {num} has unknown mark '[{mark}]'")
 
     need_field(s6, 6, "Eval folder", False)
+    need_field(s6, 6, "Seeded from", False)
     target = warns if early else fails
     n = to_int(field(s6, "Eval tasks"))
     if n is None:
         target.append("Section 6: 'Eval tasks' must be a number")
     elif n < 10:
         target.append(f"Section 6: only {n} eval tasks (aim for 10 or more in light mode)")
-    for name in ["No-tool tests", "Tool-error tests"]:
+    for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s6, name))
         if k is None:
             target.append(f"Section 6: '{name}' must be a number")
-        elif k < 1 and pos != "plain-code":
-            target.append(f"Section 6: need at least 1 in '{name}'")
+        elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
+            target.append(f"Section 6: need at least 1 in '{name}' because the design uses tools")
+        elif name == "Model-error tests" and k < 1 and pos == "workflow" and not has_tools:
+            target.append("Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+        elif name == "Unsafe-request tests" and k < 1 and pos == "workflow":
+            warns.append("Section 6: 'Unsafe-request tests' is 0. Add at least one destructive or injection task.")
 
     trig = [l for l in s7.splitlines() if l.strip().startswith("- ") and not is_placeholder(l.strip()[2:])]
     if not trig:
@@ -282,6 +289,14 @@ def main():
                 fails.append(f"Section 5: placeholder or blank in row: {'|'.join(cells)[:60]}")
             elif cells[0].lower() != "none" and cells[1].lower() not in ("read-only", "read-write"):
                 fails.append(f"Section 5: tool '{cells[0]}' must be read-only or read-write")
+    has_tools = any(
+        cells
+        and cells[0].strip()
+        and cells[0].strip().lower() != "none"
+        and not is_na(cells[0])
+        and not is_placeholder(cells[0])
+        for cells in tdata
+    )
     rt = need_field(s5, 5, "Robot test")
     if pos in AGENTISH and rt and is_na(rt):
         fails.append("Section 5: agents need a real 'Robot test' result (cannot be n/a)")
@@ -405,11 +420,15 @@ def main():
         target.append(f"Section 11: only {n} eval tasks (aim for {MIN_EVALS} to 50)")
     if marks.get(13) == "x" and (n is None or n < MIN_EVALS):
         fails.append("Section 10: item 13 is ticked but section 11 has fewer than 20 eval tasks. Mark item 13 n/a (with a reason) or finish the evals.")
-    for name in ["No-tool tests", "Tool-error tests", "Unsafe-request tests"]:
+    for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s11, name))
         if k is None:
             target.append(f"Section 11: '{name}' must be a number")
-        elif k < 1 and pos != "plain-code":
+        elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
+            target.append(f"Section 11: need at least 1 in '{name}' because the design uses tools")
+        elif name == "Model-error tests" and k < 1 and pos != "plain-code" and not has_tools:
+            target.append("Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+        elif name == "Unsafe-request tests" and k < 1 and pos != "plain-code":
             target.append(f"Section 11: need at least 1 in '{name}'")
 
     # 12 Measurements

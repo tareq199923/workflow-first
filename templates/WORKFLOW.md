@@ -85,10 +85,11 @@ Mark each item [x] when done, or [n/a: reason].
 ## 11. Evals
 Eval folder: <path, e.g. evals/>
 Eval tasks: <number, aim for 20 to 50>
-Seeded from: <bugs, user feedback, manual QA you already do>
-No-tool tests: <number of tests where the tool must NOT be called>
-Tool-error tests: <number>
-Unsafe-request tests: <number>
+Seeded from: <bug | user feedback | manual QA | synthetic>
+No-tool tests: <number of tests where a tool must NOT be called; 0 if there are no tools>
+Tool-error tests: <number; 0 if there are no tools>
+Model-error tests: <number; at least 1 when the design has no tools>
+Unsafe-request tests: <number; at least 1 for any design with an LLM>
 Metric: <pass@k | pass^k | other, and why>
 Run conditions: <model, provider, endpoint/harness, runs per task (more than once), kept the same when comparing>
 Tracked: <task success, tool-selection accuracy, invalid-call rate, retries, latency, token cost, failures, recovery success>

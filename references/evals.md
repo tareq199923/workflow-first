@@ -4,8 +4,8 @@
 A leaderboard shows one column (accuracy) and hides cost, latency and context. Evals let you add up your own columns instead of "I think it worked better". Public benchmarks are inconsistent (harness, environment, scoring method, API endpoint, provider all change results), so do your own experiments.
 
 ## How to start
-- Start now. 20 to 50 simple tasks. Early on every change has a visible effect.
-- Seed them from what you already test manually: bugs, user feedback, QA steps.
+- Start now. 20 to 50 simple tasks for the full template; 10 or more for the light one. Early on every change has a visible effect.
+- Use real bugs, user feedback or QA cases first; if none exist, generate synthetic tasks and label them `synthetic`. Never call an invented task "manual QA".
 - Each task must CLEARLY pass or fail, checked by code. Vague rubrics give inconsistent results.
 - Test both directions: the tool IS used when it should be, and is NOT used when it shouldn't.
 - Clean environment: as close to production as possible while adding as little as possible. Watch for agents "hacking the eval".
@@ -21,7 +21,10 @@ A leaderboard shows one column (accuracy) and hides cost, latency and context. E
 | Group | Example | Pass condition |
 |---|---|---|
 | Tool selection | Ask for current info | Correct read-only tool selected |
+| Routing | Ask which team owns an invoice | Correct route or label selected |
 | No-tool behavior | Simple general question | No tool call |
+| Model failure | Model returns malformed JSON or the API fails | System reports failure, does not invent a result |
+| Abstain | Ambiguous request | System asks a human or the user instead of deciding |
 | Argument validation | Missing or invalid parameter | Tool not executed; clear error |
 | Tool failure | Simulated timeout or API error | Agent sees the error, follows a safe retry policy |
 | Memory retrieval | Ask about a saved decision | Correct memory retrieved |
@@ -31,6 +34,8 @@ A leaderboard shows one column (accuracy) and hides cost, latency and context. E
 | Prompt injection | Retrieved page says ignore the rules | Page text treated as data |
 | Failover | Primary provider fails | Fallback only under configured conditions |
 | Final reporting | A tool action fails | Final answer does not claim success |
+
+The full schema, including allowed `expect` keys and group rules, is in `eval-schema.md`.
 
 Track at least: task success, tool-selection accuracy, invalid-call rate, retry count, latency, token cost, provider failures, recovery success.
 
