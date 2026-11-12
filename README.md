@@ -86,6 +86,16 @@ It prints `OK` and exits 0 when the document passes, and prints `FAIL:` lines wh
 
 The checker also catches contradictions, for example a guardrail ticked while another section says n/a.
 
+## Running the tests
+
+From the skill folder:
+
+```
+python -m unittest discover -s tests -v
+```
+
+If `python` is not found, use `py`.
+
 ## Install
 
 Copy the whole `workflow-first` folder into your agent's skills folder, for example `.opencode\skills\workflow-first\`. Other agents may use a different folder. This repository does not claim support for any agent that is not named here.
