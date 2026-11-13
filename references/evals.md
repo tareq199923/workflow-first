@@ -11,6 +11,8 @@ A leaderboard shows one column (accuracy) and hides cost, latency and context. E
 - Test both directions: the tool IS used when it should be, and is NOT used when it shouldn't.
 - Clean environment: as close to production as possible while adding as little as possible. Watch for agents "hacking the eval".
 - Run each task more than once. Keep model, provider, endpoint and harness the same when comparing.
+- Record the exact model name/ID, provider, endpoint, date, harness version and relevant generation settings for every run. Do not group results under a vague family name when a specific variant is available.
+- Current planned model coverage for this project: GLM 5.3 Flash (initial baseline), Claude Sonnet 5.5 (`claude-sonnet-5-5`) and DeepSeek V4.1 Flash (DeepSeek API alias: `deepseek-flash`). Record actual runs separately; listing a model here does not mean its evals have completed.
 - Log trajectories. Judging the path is hard (an unexpected valid route should not be punished); prefer outcome checks with a few path checks.
 
 ## Metric

@@ -12,10 +12,11 @@ plain code  ->  workflow  ->  single agent  ->  multi-agent
 
 ## Status
 
-**Status: pre-release (v0.x). Evals in progress. Tested on a small number of runs with GLM 5.3 Flash.**
+**Status: pre-release (v0.x). Evals in progress.**
 
 - The checker was tested: a known-good document prints `OK`, and a deliberately broken one gives exactly two `FAIL:` lines.
-- All agent tests so far used GLM 5.3 Flash.
+- Initial agent-test baseline: GLM 5.3 Flash.
+- Additional models planned for evaluation: Claude Sonnet 5.5 (`claude-sonnet-5-5`) and DeepSeek V4.1 Flash (`deepseek-flash`). These are planned model comparisons, not published benchmark results.
 
 ## The idea
 
@@ -110,7 +111,153 @@ If `python` is not found, use `py`.
 
 ## Install
 
-Copy the whole `workflow-first` folder into your agent's skills folder, for example `.opencode\skills\workflow-first\`. Other agents may use a different folder. This repository does not claim support for any agent that is not named here.
+`workflow-first` is a folder-based skill. Install the **entire repository folder**, not just `SKILL.md`: the skill may need `references/`, `templates/` and `scripts/` while it runs. The destination must contain `workflow-first/SKILL.md`.
+
+The examples below cover Claude Code, OpenAI Codex and OpenCode. Choose **project-local** when only one repository should use the skill; choose **global** when you want it available across your projects. You can install it in more than one agent by copying the same source folder to each agent's skill directory.
+
+### 1. Get the skill
+
+Clone the repository once. In PowerShell:
+
+```powershell
+git clone https://github.com/tareq199923/workflow-first.git "$HOME\workflow-first-source"
+```
+
+In macOS/Linux:
+
+```bash
+git clone https://github.com/tareq199923/workflow-first.git ~/workflow-first-source
+```
+
+To update it later, run `git -C "$HOME\workflow-first-source" pull` in PowerShell, or `git -C ~/workflow-first-source pull` on macOS/Linux. Then copy the updated folder into the destination you use.
+
+### 2. Install for Claude Code
+
+Claude Code uses `.claude/skills/` for project skills and `~/.claude/skills/` for user-wide skills. The folder name should be `workflow-first`.
+
+**Project-local (only the current repository):** run these commands from the root of the project where you want to use the skill.
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force .claude\skills | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" ".claude\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p .claude/skills
+cp -R ~/workflow-first-source .claude/skills/workflow-first
+```
+
+**Global (available across your projects):**
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" "$HOME\.claude\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R ~/workflow-first-source ~/.claude/skills/workflow-first
+```
+
+Start a new Claude Code session. Ask it to use the `workflow-first` skill, or invoke the skill by its name if it appears in the available skills list.
+
+### 3. Install for OpenAI Codex
+
+Codex discovers project skills in `.agents/skills/` and user-wide skills in `~/.agents/skills/`.
+
+**Project-local:** run from the root of your target repository.
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force .agents\skills | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" ".agents\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p .agents/skills
+cp -R ~/workflow-first-source .agents/skills/workflow-first
+```
+
+**Global:**
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.agents\skills" | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" "$HOME\.agents\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R ~/workflow-first-source ~/.agents/skills/workflow-first
+```
+
+Open Codex and run `/skills` to check discovery, then invoke `$workflow-first` or ask Codex to use the skill. If it does not appear after copying, restart Codex.
+
+### 4. Install for OpenCode
+
+OpenCode supports project-local `.opencode/skills/` and global `~/.config/opencode/skills/` locations.
+
+**Project-local:** run from the root of your target repository.
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force .opencode\skills | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" ".opencode\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p .opencode/skills
+cp -R ~/workflow-first-source .opencode/skills/workflow-first
+```
+
+**Global:**
+
+PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills" | Out-Null
+Copy-Item -Recurse -Force "$HOME\workflow-first-source" "$HOME\.config\opencode\skills\workflow-first"
+```
+
+macOS/Linux:
+
+```bash
+mkdir -p ~/.config/opencode/skills
+cp -R ~/workflow-first-source ~/.config/opencode/skills/workflow-first
+```
+
+Start a new OpenCode session and ask it to use `workflow-first`. OpenCode also recognizes the Claude-compatible and `.agents/skills/` locations listed above.
+
+### 5. Check the installation
+
+Whichever agent you use, check that the final path contains at least:
+
+```text
+workflow-first/
+  SKILL.md
+  references/
+  scripts/
+  templates/
+```
+
+Then open a fresh agent session and ask: `Use the workflow-first skill to help me design a small AI project. Start by interviewing me; do not invent decisions.` The agent should follow the interview in `SKILL.md`. If it cannot find the skill, check the folder nesting: a common mistake is accidentally creating `workflow-first/workflow-first/SKILL.md` or copying only `SKILL.md`.
 
 ## Folder layout
 
