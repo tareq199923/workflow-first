@@ -522,6 +522,16 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertIn("structure, not truth", skill)
         self.assertIn("--allow-open", skill)
 
+    def test_skill_md_step8_leaves_unanswered_guardrails_open(self):
+        skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("leave it `[ ]` (open)", skill)
+        self.assertIn("never tick it for them", skill)
+
+    def test_skill_md_step12_handles_missing_pyyaml(self):
+        skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("pip install pyyaml", skill)
+        self.assertIn("do not skip the check", skill)
+
     def test_no_provenance_text_in_template_fields(self):
         for name in ("WORKFLOW.md", "WORKFLOW-light.md", "WORKFLOW-light.example.md"):
             text = (REPO_ROOT / "templates" / name).read_text(encoding="utf-8")
