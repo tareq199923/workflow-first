@@ -107,11 +107,13 @@ Max steps / turns: 5
 Max tokens or cost: 2000 tokens
 Timeout: 30s
 When a limit is hit: return an error and send the email to manual review
+Overflow handling: email 201+ waits for the next run; none are dropped.
 
 ## 9. Error behavior, reflection and recovery
 On bad output or tool failure: return an error, not a half-finished label
 On low confidence or unclear request: send to manual review
 External signal for retries and reflection: schema check on the label
+Retry budget: 2 retries per model call
 Resume plan: n/a: one call per email
 
 ## 10. Guardrails checklist
@@ -193,7 +195,9 @@ Max steps / turns: 3
 Max tokens or cost: 4000 tokens
 Timeout: 30s
 When a limit is hit: return an error
+Overflow handling: tickets over a limit wait for the next run; none are dropped.
 On bad output or tool failure: return an error
+Retry budget: 2 retries per model call
 
 ## 5. Core guardrails
 - [x] 1. A limit on every LLM call chain or loop

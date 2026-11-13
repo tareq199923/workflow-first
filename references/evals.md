@@ -6,6 +6,7 @@ A leaderboard shows one column (accuracy) and hides cost, latency and context. E
 ## How to start
 - Start now. 20 to 50 simple tasks for the full template; 10 or more for the light one. Early on every change has a visible effect.
 - Use real bugs, user feedback or QA cases first; if none exist, generate synthetic tasks and label them `synthetic`. Never call an invented task "manual QA".
+- Record the user's `Retry budget` in `WORKFLOW.md`; each task's `max_retries` must stay within it. Never choose the budget for the user.
 - Each task must CLEARLY pass or fail, checked by code. Vague rubrics give inconsistent results.
 - Test both directions: the tool IS used when it should be, and is NOT used when it shouldn't.
 - Clean environment: as close to production as possible while adding as little as possible. Watch for agents "hacking the eval".

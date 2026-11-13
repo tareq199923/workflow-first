@@ -83,6 +83,11 @@ def to_int(v):
         return None
 
 
+def is_retry_budget(v):
+    """D4: a number plus what it covers (the user chooses it, never the assistant)."""
+    return bool(v) and bool(re.search(r"\d", v)) and bool(re.search(r"[A-Za-z]", v))
+
+
 # D2: only these four phrases contradict a ticked [x]. "pending", "to run" and
 # "not yet executed" are deliberately absent (they are normal plans, not contradictions).
 NOT_DONE = re.compile(
@@ -164,6 +169,17 @@ def check_light(text, early):
         fails.append("Section 3: a step decided by 'model' means an agent step. Use the full template, or change the arrows.")
 
     vals = {n: need_field(s4, 4, n) for n in ["Max steps / turns", "Max tokens or cost", "Timeout", "When a limit is hit"]}
+    overflow = need_field(s4, 4, "Overflow handling")
+    limits = [vals["Max steps / turns"], vals["Max tokens or cost"], vals["Timeout"]]
+    any_limit = any(v is not None and not is_na(v) for v in limits)
+    if overflow and not is_placeholder(overflow):
+        if is_na(overflow) and any_limit:
+            fails.append("Section 4: 'Overflow handling' cannot be n/a when a limit is set")
+        elif not is_na(overflow) and len(overflow.strip()) < 20:
+            fails.append("Section 4: 'Overflow handling' needs at least 20 characters")
+    rb = need_field(s4, 4, "Retry budget", False)
+    if rb and not is_placeholder(rb) and (is_na(rb) or not is_retry_budget(rb)):
+        fails.append("Section 4: 'Retry budget' must be a number plus what it covers (n/a is not allowed)")
     need_field(s4, 4, "On bad output or tool failure")
     if pos == "workflow":
         if all(is_na(v) for k, v in vals.items() if k != "When a limit is hit" and v is not None):
@@ -420,6 +436,14 @@ def main():
     vals = {}
     for name in ["Max steps / turns", "Max tokens or cost", "Timeout", "When a limit is hit"]:
         vals[name] = need_field(s8, 8, name)
+    overflow = need_field(s8, 8, "Overflow handling")
+    limits = [vals["Max steps / turns"], vals["Max tokens or cost"], vals["Timeout"]]
+    any_limit = any(v is not None and not is_na(v) for v in limits)
+    if overflow and not is_placeholder(overflow):
+        if is_na(overflow) and any_limit:
+            fails.append("Section 8: 'Overflow handling' cannot be n/a when a limit is set")
+        elif not is_na(overflow) and len(overflow.strip()) < 20:
+            fails.append("Section 8: 'Overflow handling' needs at least 20 characters")
     if pos != "plain-code":
         limits = [vals["Max steps / turns"], vals["Max tokens or cost"], vals["Timeout"]]
         if all(is_na(v) for v in limits if v is not None):
@@ -438,6 +462,9 @@ def main():
         fails.append("Section 9: reflection/evaluator patterns need a real external signal (test, compiler, API error, schema, human)")
     elif sig and re.search(r"self-critique|model only|llm only|no external", sig.lower()):
         warns.append("Section 9: reflection with no external signal can make answers worse. Look for a test or deterministic check.")
+    rb = need_field(s9, 9, "Retry budget", False)
+    if rb and not is_placeholder(rb) and (is_na(rb) or not is_retry_budget(rb)):
+        fails.append("Section 9: 'Retry budget' must be a number plus what it covers (n/a is not allowed)")
     need_field(s9, 9, "Resume plan")
     if len(re.findall(r"^[ \t]*(?:[-*][ \t]+)?\**Resume plan\**[ \t]*:\**", s9, re.M)) > 1:
         fails.append("Section 9: 'Resume plan' appears more than once. Keep a single line.")

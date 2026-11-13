@@ -25,7 +25,9 @@ Max steps / turns: <number or "n/a: reason">
 Max tokens or cost: <value or "n/a: reason">
 Timeout: <value or "n/a: reason">
 When a limit is hit: <return an error / other>
+Overflow handling: <what happens to the item or work that exceeds each limit>
 On bad output or tool failure: <default is return an error, not a half-finished answer>
+Retry budget: <number and what it covers>
 
 ## 5. Core guardrails
 Mark each item [x] when complete, [ ] while open (incomplete), or [n/a: reason] when not applicable.

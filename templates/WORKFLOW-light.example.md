@@ -24,7 +24,9 @@ Max steps / turns: 3
 Max tokens or cost: 4000 tokens
 Timeout: 30s
 When a limit is hit: return an error
+Overflow handling: tickets over a limit wait for the next run; none are dropped.
 On bad output or tool failure: return an error
+Retry budget: 2 retries per model call
 
 ## 5. Core guardrails
 - [x] 1. A limit on every LLM call chain or loop

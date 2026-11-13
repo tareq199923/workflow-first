@@ -53,11 +53,13 @@ Max steps / turns: <number or "n/a: reason">
 Max tokens or cost: <value or "n/a: reason">
 Timeout: <value or "n/a: reason">
 When a limit is hit: <return an error / wrap up with a summary and log it / other>
+Overflow handling: <what happens to the item or work that exceeds each limit>
 
 ## 9. Error behavior, reflection and recovery
 On bad output or tool failure: <default is return an error, not a half-finished answer>
 On low confidence or unclear request: <ask the user / escalate to a human / n/a: reason>
 External signal for retries and reflection: <test, compiler, API error, schema check, human check, or "n/a: reason">
+Retry budget: <number and what it covers>
 Resume plan: <how an interrupted task continues from the last confirmed step without repeating unsafe actions, or "n/a: reason">
 
 ## 10. Guardrails checklist

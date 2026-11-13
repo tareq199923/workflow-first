@@ -21,7 +21,7 @@
 2. Add a gate or schema check between steps
 3. Try one stronger model on the failing step (one large-model call can beat 3 to 5 small-model calls)
 4. Shrink or summarize the context; use RAG or a re-ranker if retrieval is the problem
-5. Add an external signal (a test) and a bounded retry
+5. Add an external signal (a test) and retry within the user's retry budget
 6. Only then: a single agent for that one step, inside the workflow
 7. Only then: more agents, and pick the pattern on purpose
 

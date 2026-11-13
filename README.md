@@ -71,18 +71,30 @@ Use it when you start an AI-powered project, feature or automation (LLM, agent, 
 
 `templates/WORKFLOW-light.example.md` is a filled-in light file that passes the checker.
 
-## The checker
+## The checkers
 
 `scripts/check_workflow.py` validates a `WORKFLOW.md`. It requires Python 3 only, with no extra packages.
 
 ```
 py scripts\check_workflow.py WORKFLOW.md
 py scripts\check_workflow.py --early WORKFLOW.md
+py scripts\check_workflow.py --allow-open WORKFLOW.md
 ```
 
 It prints `OK` and exits 0 when the document passes, and prints `FAIL:` lines when it does not. If `py` is not found, use `python` or `python3`.
 
 `--early` is for the start of a project. It downgrades to warnings all the eval-count minimums (the `Eval tasks` total and the `No-tool`, `Tool-error`, `Model-error` and `Unsafe-request` group minimums) and the Section 12 measurements table. It exists for project start, when no evals exist yet, so a design whose eval counts are all 0 can pass. It downgrades nothing else: a ticked guardrail 13 (evals done) with too few evals still fails, fields that are not numbers still fail, and all other rules apply.
+
+`--allow-open` turns open guardrail items into one warning instead of a failure. It is draft/structural mode only; a design with open items is not ready.
+
+`scripts/check_evals.py` validates the eval files against `WORKFLOW.md` and `references/eval-schema.md`. It needs PyYAML (`pip install pyyaml`); if PyYAML is missing it prints a clear message and exits 2. It reads the `Eval folder` field (or `--evals PATH`), checks every `.yaml`/`.yml` file, and cross-checks the Section 11 or light Section 6 counts.
+
+```
+py scripts\check_evals.py WORKFLOW.md
+py scripts\check_evals.py WORKFLOW.md --evals evals
+```
+
+Both checkers verify structure, not truth. A passing checker is not proof that the design is right.
 
 The checker also catches contradictions, for example a guardrail ticked while another section says n/a.
 
@@ -110,18 +122,24 @@ workflow-first/
     build-order.md
     context-memory-rag.md
     decision-guide.md
+    eval-schema.md
     evals.md
     glossary.md
     guardrails.md
     scorecard.md
     tool-design.md
   scripts/
-    check_workflow.py           the checker
+    check_workflow.py           the workflow checker
+    check_evals.py              the eval checker
   templates/
     WORKFLOW.md                 full template (14 sections)
     WORKFLOW-light.md           light template (7 sections)
     WORKFLOW-light.example.md   a filled-in light file that passes the checker
     eval-task.yaml              template for one eval task
+  tests/
+    helpers.py
+    test_check_workflow.py
+    test_check_evals.py
   assets/
     workflow-first-overview.svg the diagram at the top of this README
 ```

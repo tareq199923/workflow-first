@@ -1,3 +1,4 @@
+import re
 import tempfile
 import unittest
 
@@ -63,6 +64,43 @@ class CheckWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="workflow first cwd ") as tmp:
             code, output = run_checker(VALID_FULL, cwd=tmp)
         self.assertEqual(code, 0, output)
+
+    def test_full_requires_retry_budget(self):
+        text = VALID_FULL.replace("Retry budget: 2 retries per model call\n", "")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Retry budget", output)
+
+    def test_light_requires_retry_budget(self):
+        text = VALID_LIGHT.replace("Retry budget: 2 retries per model call\n", "")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Retry budget", output)
+
+    def test_missing_overflow_handling_fails(self):
+        text = VALID_FULL.replace(
+            "Overflow handling: email 201+ waits for the next run; none are dropped.\n",
+            "",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Overflow handling", output)
+
+    def test_overflow_na_fails_when_limit_set(self):
+        full = VALID_FULL.replace(
+            "Overflow handling: email 201+ waits for the next run; none are dropped.",
+            "Overflow handling: n/a: no overflow",
+        )
+        code, output = run_checker(full)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Overflow handling", output)
+        light = VALID_LIGHT.replace(
+            "Overflow handling: tickets over a limit wait for the next run; none are dropped.",
+            "Overflow handling: n/a: no overflow",
+        )
+        code, output = run_checker(light)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Overflow handling", output)
 
     def test_bare_na_agent_steps_fails(self):
         """P7: a bare n/a on Agent steps inside workflow should fail."""
@@ -466,6 +504,36 @@ class CheckWorkflowTests(unittest.TestCase):
             "WARN: Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'",
             output,
         )
+
+    def test_skill_md_no_absolute_no_supervisor_wording(self):
+        skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "Do not recommend a supervisor for dependent steps, FAQ bots, or coding agents. "
+            "Peer-to-peer is a last resort.",
+            skill,
+        )
+        self.assertNotIn("No supervisor for dependent steps", skill)
+        self.assertIn("Also fill the `Override` field.", skill)
+
+    def test_skill_md_mentions_both_checkers(self):
+        skill = (REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("check_workflow.py", skill)
+        self.assertIn("check_evals.py", skill)
+        self.assertIn("structure, not truth", skill)
+        self.assertIn("--allow-open", skill)
+
+    def test_no_provenance_text_in_template_fields(self):
+        for name in ("WORKFLOW.md", "WORKFLOW-light.md", "WORKFLOW-light.example.md"):
+            text = (REPO_ROOT / "templates" / name).read_text(encoding="utf-8")
+            for line in text.splitlines():
+                if not re.match(r"^\s*(?:[-*]\s+)?[A-Za-z][\w /()-]*\s*:", line):
+                    continue
+                value = re.sub(r"\bconfirmed step\b", "step", line, flags=re.I)
+                self.assertNotRegex(
+                    value,
+                    r"\bconfirmed\b|\bdecided by user\b|\(user\)|\b\d{4}-\d{2}-\d{2}\b",
+                    f"{name}: provenance text is not allowed in a field: {line}",
+                )
 
     def test_check_workflow_runs_with_python_S(self):
         example = (REPO_ROOT / "templates" / "WORKFLOW-light.example.md").read_text(encoding="utf-8")

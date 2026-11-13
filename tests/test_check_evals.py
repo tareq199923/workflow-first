@@ -108,6 +108,25 @@ class CheckEvalsTests(unittest.TestCase):
         code, output = run_evals(FULL_EVAL_WORKFLOW, TASKS)
         self.assertEqual(code, 0, output)
 
+    def test_eval_template_uses_max_retries(self):
+        template = (REPO_ROOT / "templates" / "eval-task.yaml").read_text(encoding="utf-8")
+        self.assertIn("max_retries:", template)
+        self.assertNotIn("retries_" + "at_most", template)
+
+    def test_no_retries_at_most_two_anywhere(self):
+        forbidden = "retries_" + "at_most"
+        for path in REPO_ROOT.rglob("*"):
+            if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts:
+                continue
+            if path.name in ("FIX-SPEC.md", "PROMPTS.md"):
+                continue
+            if path.resolve() == Path(__file__).resolve():
+                continue
+            if path.suffix.lower() not in (".md", ".py", ".yaml", ".yml", ".txt"):
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            self.assertNotIn(forbidden, text, str(path))
+
     def test_template_examples_include_required_fields(self):
         template = (REPO_ROOT / "templates" / "eval-task.yaml").read_text(encoding="utf-8")
         workflow = EVAL_WORKFLOW.replace("Eval tasks: 5", "Eval tasks: 7").replace(
