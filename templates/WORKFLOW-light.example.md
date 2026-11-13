@@ -10,7 +10,7 @@ Position: workflow
 Pattern: prompt chaining
 Why not further left: Needs language understanding that code cannot do.
 Tools used: none
-Agent steps inside workflow: n/a: none
+Agent steps inside workflow: n/a: no agent steps
 
 ## 3. Arrows (who decides the next step)
 | Step | Decided by | Notes |

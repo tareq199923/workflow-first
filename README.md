@@ -82,7 +82,7 @@ py scripts\check_workflow.py --early WORKFLOW.md
 
 It prints `OK` and exits 0 when the document passes, and prints `FAIL:` lines when it does not. If `py` is not found, use `python` or `python3`.
 
-`--early` is for the start of a project. Eval counts and the measurements table become warnings. Evidence for an agent design, stop conditions and every other rule are still enforced.
+`--early` is for the start of a project. It downgrades only the eval-count minimum and the measurements table to warnings. A ticked guardrail 13 (evals done) with fewer than the minimum tasks still fails. Evidence for an agent design, stop conditions and every other rule are still enforced.
 
 The checker also catches contradictions, for example a guardrail ticked while another section says n/a.
 

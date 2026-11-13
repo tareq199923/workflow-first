@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Plain-code checker for WORKFLOW.md (no LLM). Exit 0 = pass, 1 = failures.
 
-Usage: python check_workflow.py WORKFLOW.md [--early]
+Usage: python check_workflow.py WORKFLOW.md [--early] [--allow-open]
 A file with a line "Mode: light" is checked with the short light rules.
---early: eval counts and the measurements table become warnings (use at project start).
+Guardrail marks: [x] complete, [ ] OPEN (incomplete), [n/a: reason] not applicable.
+--early: downgrades ONLY the eval-count minimum and the measurements table to warnings.
+        A ticked guardrail 13 with fewer than the minimum tasks still fails.
         Evidence, stop conditions and every other rule are still enforced.
+--allow-open: draft/structural mode only; not a ready design. OPEN guardrail
+        items become one warning instead of a failure.
 """
 import re
 import sys
@@ -13,6 +17,7 @@ POSITIONS = ["plain-code", "workflow", "single-agent", "multi-agent"]
 DECIDERS = {"code", "classifier", "model"}
 MIN_EVALS = 20
 N_GUARDRAILS = 20
+N_LIGHT_GUARDRAILS = 8
 AGENTISH = ("single-agent", "multi-agent")
 
 
@@ -74,6 +79,25 @@ def to_int(v):
         return None
 
 
+# D2: only these four phrases contradict a ticked [x]. "pending", "to run" and
+# "not yet executed" are deliberately absent (they are normal plans, not contradictions).
+NOT_DONE = re.compile(
+    r"\bnot\s+(?:been\s+)?(?:run|done|implemented)\b|\bincomplete\b|\bunfinished\b|\bTODO\b",
+    re.I,
+)
+
+
+def has_override_log(text):
+    """True when Section 14 has a real line with 'override' and a YYYY-MM-DD date."""
+    for line in section(text, 14).splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("- ") or is_placeholder(stripped[2:]):
+            continue
+        if re.search(r"override", stripped, re.I) and re.search(r"\d{4}-\d{2}-\d{2}", stripped):
+            return True
+    return False
+
+
 def table_rows(block):
     """Data rows of the first markdown table in block (header dropped, separator row optional)."""
     rows = [[c.strip() for c in r.strip().strip("|").split("|")]
@@ -84,7 +108,7 @@ def table_rows(block):
 
 def check_light(text, early):
     """Short checker for the light template (plain-code or workflow only)."""
-    fails, warns = [], []
+    fails, warns, opens = [], [], []
 
     def need_field(block, sec, name, reason_required=True):
         v = field(block, name)
@@ -103,11 +127,13 @@ def check_light(text, early):
         fails.append("Section 2: single-agent and multi-agent designs need the full template (templates/WORKFLOW.md)")
     elif pos not in ("plain-code", "workflow"):
         fails.append(f"Section 2: Position must be plain-code or workflow in light mode (got '{pos}')")
-    need_field(s2, 2, "Pattern", False)
+    pattern = need_field(s2, 2, "Pattern", False)
+    if pos != "plain-code" and pattern and is_na(pattern):
+        fails.append("Section 2: 'Pattern' cannot be n/a above plain-code")
     why = need_field(s2, 2, "Why not further left", False)
     if pos == "workflow" and why and is_na(why):
         fails.append("Section 2: 'Why not further left' cannot be n/a above plain-code")
-    inside = need_field(s2, 2, "Agent steps inside workflow", False)
+    inside = need_field(s2, 2, "Agent steps inside workflow")
     if inside and not is_placeholder(inside) and not is_na(inside):
         fails.append("Section 2: an agent step inside the workflow needs the full template (templates/WORKFLOW.md)")
     tools = need_field(s2, 2, "Tools used")
@@ -142,36 +168,46 @@ def check_light(text, early):
             fails.append("Section 4: 'When a limit is hit' cannot be n/a when an LLM is involved")
 
     items = re.findall(r"^- \[([^\]]*)\]\s*(\d+)\.\s*(.*)$", s5, re.M)
-    if len(items) < 8:
-        fails.append(f"Section 5: expected 8 guardrail items, found {len(items)}")
-    for mark, num, _ in items:
+    nums = [int(num) for _, num, _ in items]
+    expected = set(range(1, N_LIGHT_GUARDRAILS + 1))
+    missing = sorted(expected - set(nums))
+    extra = sorted(set(nums) - expected)
+    dupes = sorted({n for n in nums if nums.count(n) > 1})
+    if missing:
+        fails.append(f"Section 5: guardrail number(s) missing: {', '.join(map(str, missing))}")
+    if extra:
+        fails.append(f"Section 5: unexpected guardrail number(s): {', '.join(map(str, extra))}")
+    if dupes:
+        fails.append(f"Section 5: guardrail item(s) {', '.join(map(str, dupes))} appear more than once. Keep one line per number.")
+    for mark, num, body in items:
         m = mark.strip().lower()
+        n = int(num)
         if m == "":
-            fails.append(f"Section 5: item {num} is unchecked (mark [x] or [n/a: reason])")
+            opens.append(n)
         elif m == "x":
-            continue
+            if NOT_DONE.search(body):
+                fails.append(f"Section 5: item {n} is marked [x] but its text says it is not done: '{body}'")
         elif m.startswith("n/a"):
             if len(re.sub(r"^n/a[:\s-]*", "", m).strip()) < 8:
-                fails.append(f"Section 5: item {num} n/a needs a real reason (at least a few words)")
+                fails.append(f"Section 5: item {n} n/a needs a real reason (at least a few words)")
         else:
-            fails.append(f"Section 5: item {num} has unknown mark '[{mark}]'")
+            fails.append(f"Section 5: item {n} has unknown mark '[{mark}]'")
 
     need_field(s6, 6, "Eval folder", False)
     need_field(s6, 6, "Seeded from", False)
-    target = warns if early else fails
     n = to_int(field(s6, "Eval tasks"))
     if n is None:
-        target.append("Section 6: 'Eval tasks' must be a number")
+        fails.append("Section 6: 'Eval tasks' must be a number")
     elif n < 10:
-        target.append(f"Section 6: only {n} eval tasks (aim for 10 or more in light mode)")
+        (warns if early else fails).append(f"Section 6: only {n} eval tasks (aim for 10 or more in light mode)")
     for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s6, name))
         if k is None:
-            target.append(f"Section 6: '{name}' must be a number")
+            fails.append(f"Section 6: '{name}' must be a number")
         elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
-            target.append(f"Section 6: need at least 1 in '{name}' because the design uses tools")
+            fails.append(f"Section 6: need at least 1 in '{name}' because the design uses tools")
         elif name == "Model-error tests" and k < 1 and pos == "workflow" and not has_tools:
-            target.append("Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+            fails.append("Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'")
         elif name == "Unsafe-request tests" and k < 1 and pos == "workflow":
             warns.append("Section 6: 'Unsafe-request tests' is 0. Add at least one destructive or injection task.")
 
@@ -182,12 +218,48 @@ def check_light(text, early):
     left = PLACEHOLDER.findall(strip_code(text))
     if left:
         fails.append(f"Placeholders still in the file, for example: {left[0]}")
-    return fails, warns, "light"
+    return fails, warns, opens, "light"
+
+
+def report(fails, warns, opens, sec, allow_open, early, label=""):
+    """Print OPEN items, warnings and failures; return the exit code."""
+    for n in opens:
+        print(f"OPEN: Section {sec}: item {n} is incomplete")
+    if opens:
+        if allow_open:
+            warns.append(
+                f"Section {sec}: {len(opens)} guardrail item(s) are OPEN "
+                "(draft mode only; not a ready design)"
+            )
+        else:
+            fails.append(
+                f"Section {sec}: {len(opens)} guardrail item(s) are OPEN: "
+                f"{', '.join(map(str, opens))}. Mark each [x] (complete) or [n/a: reason]."
+            )
+    for w in warns:
+        print("WARN:", w)
+    if fails:
+        seen = set()
+        for f in fails:
+            if f not in seen:
+                print("FAIL:", f)
+                seen.add(f)
+        suffix = f" ({label} mode)" if label else ""
+        print(f"\nNot ready: {len(seen)} problem(s).{suffix}")
+        return 1
+    print(
+        "OK: WORKFLOW.md passes all checks."
+        + (f" ({label} mode)" if label else "")
+        + (" (early mode)" if early else "")
+        + (" (draft mode: open items allowed)" if opens and allow_open else "")
+    )
+    return 0
 
 
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     early = "--early" in sys.argv
+    allow_open = "--allow-open" in sys.argv
     if not args:
         print(__doc__)
         return 2
@@ -198,18 +270,10 @@ def main():
         return 2
 
     if re.search(r"^[ \t]*\**Mode\**\s*:\**\s*light\**\s*$", text, re.M | re.I):
-        fails, warns, _ = check_light(text, early)
-        for w in warns:
-            print("WARN:", w)
-        if fails:
-            for f in dict.fromkeys(fails):
-                print("FAIL:", f)
-            print(f"\nNot ready: {len(set(fails))} problem(s). (light mode)")
-            return 1
-        print("OK: WORKFLOW.md passes all checks. (light mode)" + (" (early mode)" if early else ""))
-        return 0
+        fails, warns, opens, label = check_light(text, early)
+        return report(fails, warns, opens, 5, allow_open, early, label)
 
-    fails, warns = [], []
+    fails, warns, opens = [], [], []
 
     def need(cond, msg):
         if not cond:
@@ -234,18 +298,36 @@ def main():
     need(pos in POSITIONS, f"Section 2: Position must be one of {POSITIONS} (got '{pos}')")
     pattern_raw = need_field(s2, 2, "Pattern", False) or ""
     pattern = pattern_raw.lower()
+    if pos != "plain-code" and pattern_raw and is_na(pattern_raw):
+        fails.append("Section 2: 'Pattern' cannot be n/a above plain-code")
     why = need_field(s2, 2, "Why not further left", False)
     if pos and pos != "plain-code" and not is_placeholder(why):
         need(not is_na(why), "Section 2: 'Why not further left' cannot be n/a above plain-code")
     inside = field(s2, "Agent steps inside workflow")
-    need(not is_placeholder(inside), "Section 2: 'Agent steps inside workflow' is missing (write 'n/a: none')")
+    need(not is_placeholder(inside), "Section 2: 'Agent steps inside workflow' is missing (write 'n/a: no agent steps')")
+    if inside and is_na(inside) and na_without_reason(inside):
+        fails.append("Section 2: 'Agent steps inside workflow' says n/a without a reason (write 'n/a: why')")
     inner = bool(inside) and not is_placeholder(inside) and not is_na(inside)
     ev = field(s2, "Evidence")
+    need(not is_placeholder(ev), "Section 2: 'Evidence' is missing (write 'measured: ...' or 'n/a: reason')")
+    if ev and is_na(ev) and na_without_reason(ev):
+        fails.append("Section 2: 'Evidence' says n/a without a reason (write 'n/a: why')")
+    override = field(s2, "Override")
+    override_real = override is not None and not is_placeholder(override) and not is_na(override)
+    override_used = False
     if pos in AGENTISH or inner:
-        need(not is_placeholder(ev) and not is_na(ev),
-             "Section 2: an agent (or an agent step inside a workflow) needs written 'Evidence': a measured failure of the simpler design")
-    else:
-        need(not is_placeholder(ev), "Section 2: 'Evidence' is missing (write n/a if not needed)")
+        measured = bool(ev) and bool(re.match(r"\s*measured\s*:", ev, re.I))
+        if measured:
+            pass
+        elif override_real and has_override_log(text):
+            override_used = True
+            warns.append("unmeasured design: user override recorded")
+        else:
+            fails.append(
+                "Section 2: an agent (or an agent step inside a workflow) needs 'Evidence' "
+                "starting with 'measured:', or a real 'Override' plus a Section 14 decision-log "
+                "line with 'override' and a date"
+            )
 
     # 3 Arrows
     s3 = section(text, 3)
@@ -358,9 +440,15 @@ def main():
     # 10 Guardrails
     s10 = section(text, 10)
     items = re.findall(r"^- \[([^\]]*)\]\s*(\d+)\.\s*(.*)$", s10, re.M)
-    need(len(items) >= N_GUARDRAILS, f"Section 10: guardrails checklist is incomplete (expected {N_GUARDRAILS} numbered items, found {len(items)})")
     nums = [int(num) for _, num, _ in items]
+    expected = set(range(1, N_GUARDRAILS + 1))
+    missing = sorted(expected - set(nums))
+    extra = sorted(set(nums) - expected)
     dupes = sorted({n for n in nums if nums.count(n) > 1})
+    if missing:
+        fails.append(f"Section 10: guardrail number(s) missing: {', '.join(map(str, missing))}")
+    if extra:
+        fails.append(f"Section 10: unexpected guardrail number(s): {', '.join(map(str, extra))}")
     if dupes:
         fails.append(f"Section 10: guardrail item(s) {', '.join(map(str, dupes))} appear more than once. Keep one line per number.")
     cannot_na = {}
@@ -379,9 +467,10 @@ def main():
         m = mark.strip().lower()
         n = int(num)
         if m == "":
-            fails.append(f"Section 10: item {n} is unchecked (mark [x] or [n/a: reason])")
+            opens.append(n)
         elif m == "x":
-            continue
+            if NOT_DONE.search(body):
+                fails.append(f"Section 10: item {n} is marked [x] but its text says it is not done: '{body}'")
         elif m.startswith("n/a"):
             if len(re.sub(r"^n/a[:\s-]*", "", m).strip()) < 8:
                 fails.append(f"Section 10: item {n} n/a needs a real reason (at least a few words)")
@@ -412,24 +501,23 @@ def main():
     need_field(s11, 11, "Run conditions", False)
     need_field(s11, 11, "Tracked", False)
     need_field(s11, 11, "Metric", False)
-    target = warns if early else fails
     n = to_int(field(s11, "Eval tasks"))
     if n is None:
-        target.append("Section 11: 'Eval tasks' must be a number")
+        fails.append("Section 11: 'Eval tasks' must be a number")
     elif n < MIN_EVALS:
-        target.append(f"Section 11: only {n} eval tasks (aim for {MIN_EVALS} to 50)")
+        (warns if early else fails).append(f"Section 11: only {n} eval tasks (aim for {MIN_EVALS} to 50)")
     if marks.get(13) == "x" and (n is None or n < MIN_EVALS):
         fails.append("Section 10: item 13 is ticked but section 11 has fewer than 20 eval tasks. Mark item 13 n/a (with a reason) or finish the evals.")
     for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s11, name))
         if k is None:
-            target.append(f"Section 11: '{name}' must be a number")
+            fails.append(f"Section 11: '{name}' must be a number")
         elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
-            target.append(f"Section 11: need at least 1 in '{name}' because the design uses tools")
+            fails.append(f"Section 11: need at least 1 in '{name}' because the design uses tools")
         elif name == "Model-error tests" and k < 1 and pos != "plain-code" and not has_tools:
-            target.append("Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+            fails.append("Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'")
         elif name == "Unsafe-request tests" and k < 1 and pos != "plain-code":
-            target.append(f"Section 11: need at least 1 in '{name}'")
+            fails.append(f"Section 11: need at least 1 in '{name}'")
 
     # 12 Measurements
     s12 = section(text, 12)
@@ -438,7 +526,7 @@ def main():
     good = [r for r in mrows if r and not any(is_placeholder(c) for c in r) and not r[0].lower().startswith("n/a")]
     if bad:
         fails.append("Section 12: placeholder left in the measurements table (use n/a rows if not measured yet)")
-    if pos in AGENTISH or inner:
+    if (pos in AGENTISH or inner) and not override_used:
         m_target = warns if early else fails
         if len(good) < 2:
             m_target.append("Section 12: moving right needs measurements for at least 2 designs (the simpler one and the chosen one)")
@@ -464,18 +552,7 @@ def main():
     if left:
         fails.append(f"Placeholders still in the file, for example: {left[0]}")
 
-    for w in warns:
-        print("WARN:", w)
-    if fails:
-        seen = set()
-        for f in fails:
-            if f not in seen:
-                print("FAIL:", f)
-                seen.add(f)
-        print(f"\nNot ready: {len(seen)} problem(s).")
-        return 1
-    print("OK: WORKFLOW.md passes all checks." + (" (early mode)" if early else ""))
-    return 0
+    return report(fails, warns, opens, 10, allow_open, early)
 
 
 if __name__ == "__main__":

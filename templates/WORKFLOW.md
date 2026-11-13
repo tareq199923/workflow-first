@@ -8,8 +8,9 @@ Correct result looks like: <how you know it worked>
 Position: <plain-code | workflow | single-agent | multi-agent>
 Pattern: <e.g. prompt chaining, router, ReAct, dispatcher, sequential, supervisor>
 Why not further left: <what the simpler option could not do; "n/a" only for plain-code>
-Evidence: <measured failure of the simpler design (see section 12). Required for single-agent and multi-agent. "n/a" for plain-code and workflow>
-Agent steps inside workflow: <"n/a: none" or list each step where a model picks its own actions, with its stop condition>
+Evidence: measured: <numbers from section 12> OR n/a: <reason> for workflow/plain-code; for an override leave this n/a and fill Override
+Agent steps inside workflow: <"n/a: no agent steps" or list each step where a model picks its own actions, with its stop condition>
+Override: <n/a: none, or the name of the rule the user overrode>
 
 ## 3. Arrows (who decides the next step)
 Allowed values for "Decided by": code, classifier, model
@@ -60,7 +61,7 @@ External signal for retries and reflection: <test, compiler, API error, schema c
 Resume plan: <how an interrupted task continues from the last confirmed step without repeating unsafe actions, or "n/a: reason">
 
 ## 10. Guardrails checklist
-Mark each item [x] when done, or [n/a: reason].
+Mark each item [x] when complete, [ ] while open (incomplete), or [n/a: reason] when not applicable.
 - [ ] 1. Stop condition on every loop; background processes can be killed
 - [ ] 2. Gates (plain-code checks) between steps; JSON where code validates
 - [ ] 3. Handoffs between agents validated against a schema

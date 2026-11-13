@@ -11,7 +11,7 @@ Position: <plain-code | workflow>
 Pattern: <e.g. prompt chaining, router, parallel, evaluator-optimizer>
 Why not further left: <what the simpler option could not do; "n/a" only for plain-code>
 Tools used: <none | list the tools this design can call>
-Agent steps inside workflow: <"n/a: none">
+Agent steps inside workflow: <"n/a: no agent steps">
 
 ## 3. Arrows (who decides the next step)
 Allowed values for "Decided by": code, classifier, model
@@ -28,7 +28,7 @@ When a limit is hit: <return an error / other>
 On bad output or tool failure: <default is return an error, not a half-finished answer>
 
 ## 5. Core guardrails
-Mark each item [x] when done, or [n/a: reason].
+Mark each item [x] when complete, [ ] while open (incomplete), or [n/a: reason] when not applicable.
 - [ ] 1. A limit on every LLM call chain or loop
 - [ ] 2. Gates (plain-code checks) between steps; JSON where code validates
 - [ ] 3. Return an error rather than a half-finished or untrusted answer

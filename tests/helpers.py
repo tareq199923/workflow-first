@@ -60,6 +60,7 @@ Pattern: router
 Why not further left: code cannot read free-text email intent.
 Evidence: n/a: no agent used; fixed workflow
 Agent steps inside workflow: n/a: no agent steps
+Override: n/a: none
 
 ## 3. Arrows (who decides the next step)
 Allowed values for "Decided by": code, classifier, model
@@ -114,7 +115,7 @@ External signal for retries and reflection: schema check on the label
 Resume plan: n/a: one call per email
 
 ## 10. Guardrails checklist
-Mark each item [x] when done, or [n/a: reason].
+Mark each item [x] when complete, [ ] while open (incomplete), or [n/a: reason] when not applicable.
 - [x] 1. Stop condition on every loop; background processes can be killed
 - [x] 2. Gates (plain-code checks) between steps; JSON where code validates
 - [n/a: not multi-agent] 3. Handoffs between agents validated against a schema
@@ -178,7 +179,7 @@ Position: workflow
 Pattern: prompt chaining
 Why not further left: Needs language understanding that code cannot do.
 Tools used: none
-Agent steps inside workflow: n/a: none
+Agent steps inside workflow: n/a: no agent steps
 
 ## 3. Arrows (who decides the next step)
 | Step | Decided by | Notes |

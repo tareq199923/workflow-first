@@ -19,6 +19,32 @@ def with_tools(text):
     return text
 
 
+def with_agent_step(text):
+    """Turn the no-agent full fixture into a workflow with one agent step."""
+    return text.replace(
+        "Evidence: n/a: no agent used; fixed workflow\n"
+        "Agent steps inside workflow: n/a: no agent steps",
+        "Evidence: measured: rules only 70%, agent step 91% on 20 tasks\n"
+        "Agent steps inside workflow: triage agent picks tools and stops after 3 actions",
+    )
+
+
+def with_override(text):
+    """Use the override path: unmeasured evidence plus a logged user override."""
+    text = with_agent_step(text)
+    text = text.replace(
+        "Evidence: measured: rules only 70%, agent step 91% on 20 tasks",
+        "Evidence: n/a: user accepted the evidence risk",
+    )
+    text = text.replace("Override: n/a: none", "Override: evidence requirement")
+    text = text.replace(
+        "- 2026-11-13: chose position workflow. Reason: measured rules-only failure. Decided by: user",
+        "- 2026-11-13: user override: evidence requirement. Reason: accepted risk. Decided by: user\n"
+        "- 2026-11-13: chose position workflow. Reason: measured rules-only failure. Decided by: user",
+    )
+    return text
+
+
 class CheckWorkflowTests(unittest.TestCase):
     def test_valid_full_passes(self):
         code, output = run_checker(VALID_FULL)
@@ -38,7 +64,6 @@ class CheckWorkflowTests(unittest.TestCase):
             code, output = run_checker(VALID_FULL, cwd=tmp)
         self.assertEqual(code, 0, output)
 
-    @unittest.expectedFailure
     def test_bare_na_agent_steps_fails(self):
         """P7: a bare n/a on Agent steps inside workflow should fail."""
         text = VALID_FULL.replace(
@@ -134,7 +159,6 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertEqual(code, 1, output)
         self.assertIn("Tool-error tests", output)
 
-    @unittest.expectedFailure
     def test_ticked_guardrail_with_not_run_text_fails(self):
         """P11: a ticked guardrail whose text says it was not run should fail."""
         text = VALID_FULL.replace(
@@ -144,7 +168,6 @@ class CheckWorkflowTests(unittest.TestCase):
         code, output = run_checker(text)
         self.assertEqual(code, 1, output)
 
-    @unittest.expectedFailure
     def test_guardrail_numbers_must_be_exact(self):
         """P11: guardrails numbered 1-19 plus 21 should fail."""
         text = VALID_FULL.replace(
@@ -153,6 +176,184 @@ class CheckWorkflowTests(unittest.TestCase):
         )
         code, output = run_checker(text)
         self.assertEqual(code, 1, output)
+
+    def test_incomplete_guardrail_reports_open_not_unchecked(self):
+        text = VALID_FULL.replace(
+            "- [x] 1. Stop condition on every loop; background processes can be killed",
+            "- [ ] 1. Stop condition on every loop; background processes can be killed",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("OPEN: Section 10: item 1 is incomplete", output)
+        self.assertNotIn("unchecked", output)
+
+    def test_allow_open_returns_success_with_warning(self):
+        text = VALID_FULL.replace(
+            "- [x] 1. Stop condition on every loop; background processes can be killed",
+            "- [ ] 1. Stop condition on every loop; background processes can be killed",
+        )
+        code, output = run_checker(text, "--allow-open")
+        self.assertEqual(code, 0, output)
+        self.assertIn("OPEN: Section 10: item 1 is incomplete", output)
+        self.assertIn("WARN:", output)
+        self.assertIn("draft", output.lower())
+
+    def test_incomplete_light_guardrail_reports_open(self):
+        text = VALID_LIGHT.replace(
+            "- [x] 1. A limit on every LLM call chain or loop",
+            "- [ ] 1. A limit on every LLM call chain or loop",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("OPEN: Section 5: item 1 is incomplete", output)
+        self.assertNotIn("unchecked", output)
+
+    def test_ticked_guardrail_with_incomplete_text_fails(self):
+        text = VALID_FULL.replace(
+            "- [x] 1. Stop condition on every loop; background processes can be killed",
+            "- [x] 1. robot test is incomplete",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+
+    def test_ticked_guardrail_normal_sentences_pass(self):
+        text = VALID_FULL.replace(
+            "- [x] 1. Stop condition on every loop; background processes can be killed",
+            "- [x] 1. robot test run on all 3 tools",
+        )
+        text = text.replace(
+            "- [x] 2. Gates (plain-code checks) between steps; JSON where code validates",
+            "- [x] 2. ready to run in CI",
+        )
+        text = text.replace(
+            "- [n/a: not multi-agent] 3. Handoffs between agents validated against a schema",
+            "- [x] 3. all gates are done in code",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 0, output)
+
+    def test_light_guardrail_numbers_must_be_exact(self):
+        text = VALID_LIGHT.replace(
+            "- [x] 8. Something independent verifies results (test, validator, human)",
+            "- [x] 9. Something independent verifies results (test, validator, human)",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("missing", output)
+        self.assertIn("unexpected", output)
+
+    def test_bare_na_agent_steps_fails_in_light(self):
+        text = VALID_LIGHT.replace(
+            "Agent steps inside workflow: n/a: no agent steps",
+            "Agent steps inside workflow: n/a",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+
+    def test_bare_na_evidence_fails(self):
+        text = VALID_FULL.replace(
+            "Evidence: n/a: no agent used; fixed workflow",
+            "Evidence: n/a",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+
+    def test_pattern_na_fails_above_plain_code(self):
+        full = VALID_FULL.replace("Pattern: router", "Pattern: n/a")
+        code, output = run_checker(full)
+        self.assertEqual(code, 1, output)
+        light = VALID_LIGHT.replace("Pattern: prompt chaining", "Pattern: n/a")
+        code, output = run_checker(light)
+        self.assertEqual(code, 1, output)
+
+    def test_pattern_na_allowed_for_plain_code(self):
+        text = VALID_LIGHT.replace("Position: workflow", "Position: plain-code")
+        text = text.replace("Pattern: prompt chaining", "Pattern: n/a")
+        text = text.replace(
+            "Why not further left: Needs language understanding that code cannot do.",
+            "Why not further left: n/a: plain code is enough",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 0, output)
+
+    def test_plain_none_evidence_fails_for_agent(self):
+        text = with_agent_step(VALID_FULL).replace(
+            "Evidence: measured: rules only 70%, agent step 91% on 20 tasks",
+            "Evidence: none",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+
+    def test_it_was_slow_evidence_fails_for_agent(self):
+        text = with_agent_step(VALID_FULL).replace(
+            "Evidence: measured: rules only 70%, agent step 91% on 20 tasks",
+            "Evidence: it was slow",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+
+    def test_agent_step_with_measured_evidence_passes(self):
+        code, output = run_checker(with_agent_step(VALID_FULL))
+        self.assertEqual(code, 0, output)
+
+    def test_override_with_date_and_log_passes_with_warning(self):
+        code, output = run_checker(with_override(VALID_FULL))
+        self.assertEqual(code, 0, output)
+        self.assertIn("WARN: unmeasured design: user override recorded", output)
+
+    def test_override_without_decision_log_fails(self):
+        text = with_override(VALID_FULL).replace(
+            "- 2026-11-13: user override: evidence requirement. Reason: accepted risk. Decided by: user\n",
+            "",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("decision", output)
+
+    def test_override_without_date_fails(self):
+        text = with_override(VALID_FULL).replace(
+            "- 2026-11-13: user override: evidence requirement.",
+            "- user override: evidence requirement.",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("decision", output)
+
+    def test_override_waives_section_12_measurements(self):
+        text = with_override(VALID_FULL).replace(
+            "| rules only | 3 | 70% | 0 | 1s | baseline |\n"
+            "| router | 3 | 91% | 2000 | 2s | candidate |",
+            "| rules only | 1 | 70% | 0 | 1s | one run only |",
+        )
+        code, output = run_checker(text)
+        self.assertEqual(code, 0, output)
+        self.assertIn("user override recorded", output)
+
+    def test_override_does_not_waive_eval_minimum(self):
+        text = with_override(VALID_FULL)
+        text = text.replace("Eval tasks: 20", "Eval tasks: 12")
+        text = text.replace("- [x] 13.", "- [n/a: evals not finished] 13.")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("only 12 eval tasks", output)
+
+    def test_early_mode_keeps_item13_contradiction(self):
+        text = VALID_FULL.replace("Eval tasks: 20", "Eval tasks: 12")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 1, output)
+        self.assertIn("item 13 is ticked", output)
+
+    def test_early_mode_downgrades_eval_count_only(self):
+        text = VALID_FULL.replace("Eval tasks: 20", "Eval tasks: 12")
+        text = text.replace("- [x] 13.", "- [n/a: evals not finished] 13.")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn("only 12 eval tasks", output)
+
+        text = text.replace("Model-error tests: 1", "Model-error tests: 0")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 1, output)
+        self.assertIn("Model-error tests", output)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 # Guardrails checklist (numbering matches WORKFLOW.md section 10)
-Each item is `[x]` (done) or `[n/a: reason]`. Some items cannot be n/a for some designs (the checker enforces this).
+Each item is `[x]` (complete), `[ ]` (open/incomplete), or `[n/a: reason]` (not applicable). Some items cannot be n/a for some designs (the checker enforces this).
 
 1. Stop condition on every loop (max turns / tokens / cost / time). Closing the laptop does not kill background processes; people have run agents for weeks and paid tens of thousands.
 2. Gates (plain-code checks) between steps; ask for JSON so code can validate instead of guessing.
