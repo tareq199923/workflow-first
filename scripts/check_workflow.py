@@ -4,9 +4,13 @@
 Usage: python check_workflow.py WORKFLOW.md [--early] [--allow-open]
 A file with a line "Mode: light" is checked with the short light rules.
 Guardrail marks: [x] complete, [ ] OPEN (incomplete), [n/a: reason] not applicable.
---early: downgrades ONLY the eval-count minimum and the measurements table to warnings.
-        A ticked guardrail 13 with fewer than the minimum tasks still fails.
-        Evidence, stop conditions and every other rule are still enforced.
+--early: downgrades ALL eval-count minimums (the Eval tasks total and the
+        No-tool, Tool-error, Model-error and Unsafe-request group minimums)
+        and the Section 12 measurements table to warnings. It exists for
+        project start, when no evals exist yet, so a design whose eval
+        counts are all 0 can pass. It downgrades nothing else: a ticked
+        guardrail 13 with too few evals still fails, fields that are not
+        numbers still fail, and all other rules apply.
 --allow-open: draft/structural mode only; not a ready design. OPEN guardrail
         items become one warning instead of a failure.
 """
@@ -200,14 +204,15 @@ def check_light(text, early):
         fails.append("Section 6: 'Eval tasks' must be a number")
     elif n < 10:
         (warns if early else fails).append(f"Section 6: only {n} eval tasks (aim for 10 or more in light mode)")
+    group_target = warns if early else fails
     for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s6, name))
         if k is None:
             fails.append(f"Section 6: '{name}' must be a number")
         elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
-            fails.append(f"Section 6: need at least 1 in '{name}' because the design uses tools")
+            group_target.append(f"Section 6: need at least 1 in '{name}' because the design uses tools")
         elif name == "Model-error tests" and k < 1 and pos == "workflow" and not has_tools:
-            fails.append("Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+            group_target.append("Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'")
         elif name == "Unsafe-request tests" and k < 1 and pos == "workflow":
             warns.append("Section 6: 'Unsafe-request tests' is 0. Add at least one destructive or injection task.")
 
@@ -508,16 +513,17 @@ def main():
         (warns if early else fails).append(f"Section 11: only {n} eval tasks (aim for {MIN_EVALS} to 50)")
     if marks.get(13) == "x" and (n is None or n < MIN_EVALS):
         fails.append("Section 10: item 13 is ticked but section 11 has fewer than 20 eval tasks. Mark item 13 n/a (with a reason) or finish the evals.")
+    group_target = warns if early else fails
     for name in ["No-tool tests", "Tool-error tests", "Model-error tests", "Unsafe-request tests"]:
         k = to_int(field(s11, name))
         if k is None:
             fails.append(f"Section 11: '{name}' must be a number")
         elif name in ("No-tool tests", "Tool-error tests") and k < 1 and has_tools:
-            fails.append(f"Section 11: need at least 1 in '{name}' because the design uses tools")
+            group_target.append(f"Section 11: need at least 1 in '{name}' because the design uses tools")
         elif name == "Model-error tests" and k < 1 and pos != "plain-code" and not has_tools:
-            fails.append("Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'")
+            group_target.append("Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'")
         elif name == "Unsafe-request tests" and k < 1 and pos != "plain-code":
-            fails.append(f"Section 11: need at least 1 in '{name}'")
+            group_target.append(f"Section 11: need at least 1 in '{name}'")
 
     # 12 Measurements
     s12 = section(text, 12)

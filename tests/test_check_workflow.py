@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 
-from helpers import VALID_FULL, VALID_LIGHT, run_checker
+from helpers import REPO_ROOT, VALID_FULL, VALID_LIGHT, run_checker
 
 
 def with_tools(text):
@@ -232,6 +232,22 @@ class CheckWorkflowTests(unittest.TestCase):
         code, output = run_checker(text)
         self.assertEqual(code, 0, output)
 
+    def test_ticked_guardrail_pending_phrases_pass(self):
+        """D2: pending / to run in CI / not yet executed are plans, not contradictions."""
+        phrases = ("pending", "to run in CI", "not yet executed")
+        fixtures = (
+            ("full", VALID_FULL,
+             "- [x] 1. Stop condition on every loop; background processes can be killed"),
+            ("light", VALID_LIGHT,
+             "- [x] 1. A limit on every LLM call chain or loop"),
+        )
+        for label, fixture, original in fixtures:
+            for phrase in phrases:
+                with self.subTest(mode=label, phrase=phrase):
+                    text = fixture.replace(original, f"- [x] 1. robot test {phrase}")
+                    code, output = run_checker(text)
+                    self.assertEqual(code, 0, output)
+
     def test_light_guardrail_numbers_must_be_exact(self):
         text = VALID_LIGHT.replace(
             "- [x] 8. Something independent verifies results (test, validator, human)",
@@ -352,8 +368,109 @@ class CheckWorkflowTests(unittest.TestCase):
 
         text = text.replace("Model-error tests: 1", "Model-error tests: 0")
         code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn(
+            "WARN: Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'",
+            output,
+        )
+
+        text = text.replace("Model-error tests: 0", "Model-error tests: n/a")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 1, output)
+        self.assertIn("must be a number", output)
+
+    def test_full_group_minimums_fail_without_early(self):
+        tool_text = with_tools(VALID_FULL)
+        for name, old, new in (
+            ("No-tool tests", "No-tool tests: 3", "No-tool tests: 0"),
+            ("Tool-error tests", "Tool-error tests: 2", "Tool-error tests: 0"),
+            ("Unsafe-request tests", "Unsafe-request tests: 2", "Unsafe-request tests: 0"),
+        ):
+            with self.subTest(name=name):
+                code, output = run_checker(tool_text.replace(old, new))
+                self.assertEqual(code, 1, output)
+                self.assertIn(name, output)
+
+        text = VALID_FULL.replace("Model-error tests: 1", "Model-error tests: 0")
+        code, output = run_checker(text)
         self.assertEqual(code, 1, output)
         self.assertIn("Model-error tests", output)
+
+    def test_full_group_minimums_warn_with_early(self):
+        text = with_tools(VALID_FULL)
+        text = text.replace("Eval tasks: 20", "Eval tasks: 0")
+        text = text.replace("No-tool tests: 3", "No-tool tests: 0")
+        text = text.replace("Tool-error tests: 2", "Tool-error tests: 0")
+        text = text.replace("Model-error tests: 1", "Model-error tests: 0")
+        text = text.replace("Unsafe-request tests: 2", "Unsafe-request tests: 0")
+        text = text.replace("- [x] 13.", "- [n/a: evals not written yet] 13.")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn("WARN: Section 11: only 0 eval tasks", output)
+        self.assertIn("WARN: Section 11: need at least 1 in 'No-tool tests'", output)
+        self.assertIn("WARN: Section 11: need at least 1 in 'Tool-error tests'", output)
+        self.assertIn("WARN: Section 11: need at least 1 in 'Unsafe-request tests'", output)
+
+        text = VALID_FULL.replace("Eval tasks: 20", "Eval tasks: 0")
+        text = text.replace("No-tool tests: 3", "No-tool tests: 0")
+        text = text.replace("Tool-error tests: 2", "Tool-error tests: 0")
+        text = text.replace("Model-error tests: 1", "Model-error tests: 0")
+        text = text.replace("Unsafe-request tests: 2", "Unsafe-request tests: 0")
+        text = text.replace("- [x] 13.", "- [n/a: evals not written yet] 13.")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn(
+            "WARN: Section 11: with an LLM and no tools, need at least 1 in 'Model-error tests'",
+            output,
+        )
+
+    def test_light_group_minimums_fail_without_early(self):
+        tool_text = VALID_LIGHT.replace("Tools used: none", "Tools used: search")
+
+        text = tool_text.replace("No-tool tests: 2", "No-tool tests: 0")
+        text = text.replace("Tool-error tests: 0", "Tool-error tests: 1")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("No-tool tests", output)
+
+        text = tool_text.replace("No-tool tests: 2", "No-tool tests: 1")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Tool-error tests", output)
+
+        text = VALID_LIGHT.replace("Model-error tests: 1", "Model-error tests: 0")
+        code, output = run_checker(text)
+        self.assertEqual(code, 1, output)
+        self.assertIn("Model-error tests", output)
+
+    def test_light_group_minimums_warn_with_early(self):
+        text = VALID_LIGHT.replace("Tools used: none", "Tools used: search")
+        text = text.replace("Eval tasks: 12", "Eval tasks: 0")
+        text = text.replace("No-tool tests: 2", "No-tool tests: 0")
+        text = text.replace("Model-error tests: 1", "Model-error tests: 0")
+        text = text.replace("Unsafe-request tests: 1", "Unsafe-request tests: 0")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn("WARN: Section 6: only 0 eval tasks", output)
+        self.assertIn("WARN: Section 6: need at least 1 in 'No-tool tests'", output)
+        self.assertIn("WARN: Section 6: need at least 1 in 'Tool-error tests'", output)
+        self.assertIn("WARN: Section 6: 'Unsafe-request tests' is 0", output)
+
+        text = VALID_LIGHT.replace("Eval tasks: 12", "Eval tasks: 0")
+        text = text.replace("No-tool tests: 2", "No-tool tests: 0")
+        text = text.replace("Model-error tests: 1", "Model-error tests: 0")
+        text = text.replace("Unsafe-request tests: 1", "Unsafe-request tests: 0")
+        code, output = run_checker(text, "--early")
+        self.assertEqual(code, 0, output)
+        self.assertIn(
+            "WARN: Section 6: with an LLM and no tools, need at least 1 in 'Model-error tests'",
+            output,
+        )
+
+    def test_check_workflow_runs_with_python_S(self):
+        example = (REPO_ROOT / "templates" / "WORKFLOW-light.example.md").read_text(encoding="utf-8")
+        code, output = run_checker(example, python_flags=("-S",))
+        self.assertEqual(code, 0, output)
 
 
 if __name__ == "__main__":

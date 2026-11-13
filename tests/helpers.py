@@ -9,13 +9,13 @@ CHECKER = REPO_ROOT / "scripts" / "check_workflow.py"
 EVALS_CHECKER = REPO_ROOT / "scripts" / "check_evals.py"
 
 
-def run_checker(text, *args, cwd=None):
+def run_checker(text, *args, cwd=None, python_flags=()):
     """Write text to a temp WORKFLOW.md, run the checker, return (exit_code, output)."""
     with tempfile.TemporaryDirectory(prefix="workflow first test ") as tmp:
         path = Path(tmp) / "WORKFLOW.md"
         path.write_text(text, encoding="utf-8")
         completed = subprocess.run(
-            [sys.executable, str(CHECKER), str(path), *args],
+            [sys.executable, *python_flags, str(CHECKER), str(path), *args],
             capture_output=True,
             text=True,
             cwd=cwd,
